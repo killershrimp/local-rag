@@ -17,7 +17,7 @@ class VectorDataset:
         id: int
         text: str
         embedding: List[float]
-        label: str
+        section: str
         metadata: str = ""
         timestamp: float = -1
 
@@ -28,7 +28,7 @@ class VectorDataset:
                 pa.array(
                     self.embedding, type=pa.list_(pa.float32())
                 ),  # Remove list size constraint
-                pa.array(self.label, type=pa.string()),
+                pa.array(self.section, type=pa.string()),
                 pa.array(self.metadata, type=pa.string()),
                 pa.array(self.timestamp, type=pa.timestamp("us")),
             ]
@@ -37,7 +37,7 @@ class VectorDataset:
             return {
                 "text": self.text,
                 "embedding": self.embedding,
-                "label": self.label,
+                "section": self.section,
                 "metadata": self.metadata,
                 "timestamp": self.timestamp,
             }
@@ -62,11 +62,12 @@ class VectorDataset:
             [
                 pa.field("id", pa.int64()),
                 pa.field("doc_id", pa.int64()),
+                pa.field("location", pa.string()),  # url or path
                 pa.field("text", pa.string()),
                 pa.field(
                     "embedding", pa.list_(pa.float32())
                 ),  # Remove fixed size constraint
-                pa.field("label", pa.string()),
+                pa.field("section", pa.string()),
                 pa.field("metadata", pa.string()),  # JSON string for flexible metadata
                 pa.field("timestamp", pa.timestamp("us")),
             ]
@@ -116,18 +117,20 @@ class VectorDataset:
 
     def add_doc(
         self,
+        location: str,
         text: str,
         embedding: np.ndarray,
-        label: str = "",
+        section: str = "",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Add a single row to the dataset."""
         return self.add_batch(
             [
                 {
+                    "location": location,
                     "text": text,
                     "embedding": embedding,
-                    "label": label,
+                    "section": section,
                     "metadata": metadata or {},
                 }
             ]
@@ -141,9 +144,10 @@ class VectorDataset:
         # Prepare batch data
         ids = []
         doc_ids = []
+        locations = []
         texts = []
         embeddings = []
-        labels = []
+        sections = []
         metadatas = []
         timestamps = []
 
@@ -161,9 +165,10 @@ class VectorDataset:
 
                 ids.append(self._next_id)
                 doc_ids.append(self._next_doc_id)
+                locations.append(row["section"])
                 texts.append(row["text"])
                 embeddings.append(emb.tolist())
-                labels.append(row.get("label", ""))
+                sections.append(row.get("section", ""))
                 metadatas.append(json.dumps(row.get("metadata", {})))
                 timestamps.append(current_time)
                 self._next_id += 1
@@ -174,11 +179,12 @@ class VectorDataset:
         arrays = [
             pa.array(ids, type=pa.int64()),
             pa.array(doc_ids, type=pa.int64()),
+            pa.array(locations, type=pa.string()),
             pa.array(texts, type=pa.string()),
             pa.array(
                 embeddings, type=pa.list_(pa.float32())
             ),  # Remove list size constraint
-            pa.array(labels, type=pa.string()),
+            pa.array(sections, type=pa.string()),
             pa.array(metadatas, type=pa.string()),
             pa.array(timestamps, type=pa.timestamp("us")),
         ]
@@ -238,9 +244,9 @@ class VectorDataset:
         condition = pc.match_substring_regex(self.table["text"], text_pattern)
         return self.filter(condition)
 
-    def query_by_label(self, label: str) -> "VectorDataset":
-        """Query rows by exact label match."""
-        condition = pc.equal(self.table["label"], label)
+    def query_by_section(self, section: str) -> "VectorDataset":
+        """Query rows by exact section match."""
+        condition = pc.equal(self.table["section"], section)
         return self.filter(condition)
 
     def query_by_doc_id(self, doc_id: List[int]) -> "VectorDataset":
@@ -262,8 +268,10 @@ class VectorDataset:
         for i in range(len(filtered_table)):
             row_data = {
                 "id": filtered_table["id"][i].as_py(),
+                "doc_id": filtered_table["doc_id"][i].as_py(),
+                "location": filtered_table["location"][i].as_py(),
                 "text": filtered_table["text"][i].as_py(),
-                "label": filtered_table["label"][i].as_py(),
+                "section": filtered_table["section"][i].as_py(),
                 "metadata": json.loads(filtered_table["metadata"][i].as_py()),
                 "timestamp": filtered_table["timestamp"][i].as_py(),
             }
@@ -276,9 +284,10 @@ class VectorDataset:
         return {
             "ids": table["id"].to_pylist(),
             "doc_ids": table["doc_id"].to_pylist(),
+            "locations": table["location"].to_pylist(),
             "texts": table["text"].to_pylist(),
             "embeddings": table["embedding"].to_pylist(),
-            "labels": table["label"].to_pylist(),
+            "sections": table["section"].to_pylist(),
             "metadata": [json.loads(m) for m in table["metadata"].to_pylist()],
             "timestamps": table["timestamp"].to_pylist(),
         }
@@ -333,19 +342,19 @@ if __name__ == "__main__":
                 {
                     "text": "This is a sample document about machine learning",
                     "embedding": sample_embeddings[0],
-                    "label": "ML",
+                    "section": "ML",
                     "metadata": {"category": "technical", "author": "user1"},
                 },
                 {
                     "text": "Another document about natural language processing",
                     "embedding": sample_embeddings[1],
-                    "label": "NLP",
+                    "section": "NLP",
                     "metadata": {"category": "research", "author": "user2"},
                 },
                 {
                     "text": "A third document about computer vision",
                     "embedding": sample_embeddings[2],
-                    "label": "CV",
+                    "section": "CV",
                     "metadata": {"category": "technical", "author": "user1"},
                 },
             ]
@@ -359,7 +368,7 @@ if __name__ == "__main__":
         print(f"Embeddings shape for FAISS: {embeddings.shape}")
 
         # Query examples
-        ml_docs = dataset.query_by_label("ML")
+        ml_docs = dataset.query_by_section("ML")
         print(f"ML documents: {len(ml_docs)}")
 
         tech_docs = dataset.query_by_text(".*technical.*")

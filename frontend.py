@@ -9,22 +9,6 @@ from transformers import (AutoTokenizer, DPRContextEncoder, DPRQuestionEncoder,
 from DocReader import DocReader
 from VectorDataset import VectorDataset
 
-"""
-class Client:
-    def __init__(self, model_name: str, dataset: Dataset):
-        self.retriever = RagRetriever.from_pretrained(
-            model_name, index_name="custom", passages_path=dataset
-        )
-
-    def encode_query(self, q: str) -> torch.Tensor:
-        pass
-
-    def retrieve(self, query: str):
-        tok_q = self.retriever.question_encoder_tokenizer(query)
-        doc_embd, doc_ids, doc_dicts = self.retriever.retrieve(tok_q, n_docs=5)
-        return doc_ids
-"""
-
 
 class Client:
     def __init__(
@@ -36,6 +20,7 @@ class Client:
 
         self.ctx_tok = AutoTokenizer.from_pretrained(ctx_model_name)
         self.ctx_enc = DPRContextEncoder.from_pretrained(ctx_model_name)
+        self.ctx_tok.add_special_tokens({"pad_token": self.ctx_tok.pad_token})
         self.ctx_window = 512
 
         self.q_tok = AutoTokenizer.from_pretrained(q_model_name)
@@ -49,14 +34,16 @@ class Client:
         md_outs = (self.md_formatter.read(doc) for doc in docs)
         all_content = []
 
-        for doc in md_outs:
+        for loc, doc in zip(docs, md_outs):
             sections = self.md_formatter.split_md(doc)
 
             hdr_list = []
             new_tok = []
             for j in sections:
                 # sliding window
-                new_tok += self._sliding_window_tok(j["content"])
+                new_tok += self._sliding_window_tok(
+                    j["content"], window_size=self.ctx_window, overlap_size=16
+                )
                 hdr_list += [j["header"]] * len(new_tok)
 
             new_tok = torch.stack(new_tok)
@@ -67,6 +54,7 @@ class Client:
 
             content = [
                 {
+                    "location": loc,
                     "text": text,
                     "embedding": embedding.numpy(),
                     "label": label,

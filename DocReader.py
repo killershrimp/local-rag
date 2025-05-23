@@ -14,10 +14,9 @@ class DocReader:
     def read(self, link_or_fp: str):
         """Read a document from a link"""
         return self.read_docling(link_or_fp)
-        # return self.read_pymupdf(link_or_fp)
 
-    def read_pymupdf(self, link_or_fp: str) -> str:
-        return pymupdf4llm.to_markdown(link_or_fp)
+    # def read_pymupdf(self, link_or_fp: str) -> str:
+    #     return pymupdf4llm.to_markdown(link_or_fp)
 
     def read_docling(self, link_or_fp: str) -> List[Dict[str, str]]:
         """Read a document from a link"""
