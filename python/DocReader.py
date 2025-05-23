@@ -1,0 +1,74 @@
+import re
+import time
+from typing import Dict, List
+
+# import pymupdf4llm
+from docling.document_converter import DocumentConverter
+
+
+class DocReader:
+    def __init__(self) -> None:
+        self.converter = DocumentConverter()
+        pass
+
+    def read(self, link_or_fp: str):
+        """Read a document from a link"""
+        return self.read_docling(link_or_fp)
+        # return self.read_pymupdf(link_or_fp)
+
+    def read_pymupdf(self, link_or_fp: str) -> str:
+        return pymupdf4llm.to_markdown(link_or_fp)
+
+    def read_docling(self, link_or_fp: str) -> List[Dict[str, str]]:
+        """Read a document from a link"""
+        result = self.converter.convert(link_or_fp)
+        return result.document.export_to_markdown()
+
+    def split_md(self, markdown_text):
+        # Define a regex pattern for Markdown headers
+        header_pattern = r"^(#{1,6})\s+(.*)$"
+
+        # Using finditer to find all headers in the markdown text
+        headers = [
+            (match.group(0), match.group(2), match.start())
+            for match in re.finditer(header_pattern, markdown_text, re.MULTILINE)
+        ]
+        if not headers:
+            headers = ["main"]
+
+        # Initialize a list to hold the sections
+        sections = []
+
+        # Iterate through headers and extract sections
+        for i in range(len(headers)):
+            header_full, header_text, start_index = headers[i]
+            start_pos = start_index
+
+            if i < len(headers) - 1:
+                # Get the start position of the next header
+                next_header_pos = headers[i + 1][2]
+                section_content = markdown_text[start_pos:next_header_pos].strip()
+            else:
+                # Last section goes to the end of the markdown text
+                section_content = markdown_text[start_pos:].strip()
+
+            sections.append({"header": header_text, "content": section_content})
+
+        return sections
+
+
+if __name__ == "__main__":
+    doc_reader = DocReader()
+    start = time.time()
+    markdown_text = doc_reader.read(
+        "/Users/ayun/Downloads/_NeurIPS_2025_D_B__Reuse_Bench.pdf"
+    )
+    end = time.time()
+    print(f"total time: {end - start}")
+    sections = doc_reader.split_md(markdown_text)
+    for section in sections:
+        print(f"Header: {section['header']}")
+        # print(
+        #     f"Content: {section['content'][:100]}..."
+        # )  # Print first 100 chars of content
+        # print("-" * 40)
