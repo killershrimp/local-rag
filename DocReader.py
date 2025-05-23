@@ -1,8 +1,9 @@
 import re
 import time
+from io import BytesIO
 from typing import Dict, List
 
-# import pymupdf4llm
+from docling.datamodel.base_models import DocumentStream
 from docling.document_converter import DocumentConverter
 
 
@@ -11,19 +12,16 @@ class DocReader:
         self.converter = DocumentConverter()
         pass
 
-    def read(self, link_or_fp: str):
+    # TODO: use convert_all
+    def read_link(self, link_or_fp: str) -> str:
         """Read a document from a link"""
-        return self.read_docling(link_or_fp)
+        return self.converter.convert(link_or_fp).document.export_to_markdown()
 
-    # def read_pymupdf(self, link_or_fp: str) -> str:
-    #     return pymupdf4llm.to_markdown(link_or_fp)
+    def read_bytes(self, name: str, stream: BytesIO) -> str:
+        docling_stream = DocumentStream(name=name, stream=stream)
+        return self.converter.convert(docling_stream).document.export_to_markdown()
 
-    def read_docling(self, link_or_fp: str) -> List[Dict[str, str]]:
-        """Read a document from a link"""
-        result = self.converter.convert(link_or_fp)
-        return result.document.export_to_markdown()
-
-    def split_md(self, markdown_text):
+    def split_md(self, markdown_text: str):
         # Define a regex pattern for Markdown headers
         header_pattern = r"^(#{1,6})\s+(.*)$"
 
@@ -33,7 +31,7 @@ class DocReader:
             for match in re.finditer(header_pattern, markdown_text, re.MULTILINE)
         ]
         if not headers:
-            headers = ["main"]
+            headers = [["main", "main", 0]]
 
         # Initialize a list to hold the sections
         sections = []

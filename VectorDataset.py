@@ -165,7 +165,7 @@ class VectorDataset:
 
                 ids.append(self._next_id)
                 doc_ids.append(self._next_doc_id)
-                locations.append(row["section"])
+                locations.append(row["location"])
                 texts.append(row["text"])
                 embeddings.append(emb.tolist())
                 sections.append(row.get("section", ""))
@@ -313,12 +313,16 @@ class VectorDataset:
         return f"VectorDataset(name='{self.name}', rows={len(self.table)}, dim={self.embedding_dim})"
 
     def faiss_search(self, query_embedding, k=2) -> List[Dict[str, Any]]:
+        k = min(k, len(self))
+
         distances, indices = self.index.search(x=query_embedding, k=k)
 
         # Get metadata for results
         results = self.get_metadata_by_indices(indices[0])
-        for i, result in enumerate(results):
-            print(f"Result {i}: {result['text'][:50]}... (score: {distances[0][i]})")
+        # for i, result in enumerate(results):
+        #     print(
+        #         f"Result {i}: {result['text'][:50]}... (score: {distances[0][i]}) (loc: {result['location']}) (section: {result['section']})"
+        #     )
         return results
 
 

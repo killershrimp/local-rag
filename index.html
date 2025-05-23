@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Localized Document Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.8;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px;
+        }
+
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            background: #fafbfc;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-upload input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-upload-label {
+            display: block;
+            padding: 20px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .file-upload-label:hover {
+            border-color: #5a6fd8;
+            background: #f0f2ff;
+        }
+
+        .file-upload-label.dragover {
+            border-color: #4c63d2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .upload-method-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .method-btn {
+            flex: 1;
+            background: #f8f9ff;
+            color: #667eea;
+            border: 2px solid #e1e8ed;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .method-btn:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+            transform: translateY(-1px);
+        }
+
+        .method-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-section {
+            display: none;
+        }
+
+        .upload-section.active {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            color: #667eea;
+        }
+
+        .loading.show {
+            display: flex;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e1e8ed;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .results {
+            margin-top: 30px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            background: #f8f9ff;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            animation: slideIn 0.3s ease;
+        }
+
+        .result-item h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .result-item p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .success-message, .error-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            animation: slideIn 0.3s ease;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Vector Database Client</h1>
+            <p>Query your document database and upload new ones</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Query Section -->
+            <div class="section">
+                <h2>
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                    </svg>
+                    Query Database
+                </h2>
+
+                <form id="queryForm">
+                    <div class="form-group">
+                        <label for="query">Search Query:</label>
+                        <textarea 
+                            id="query" 
+                            name="query" 
+                            placeholder="Enter your search query here..."
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numResults">Number of Results:</label>
+                        <select id="numResults" name="numResults">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                            <option value="25">25</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" id="queryBtn">
+                        Search Database
+                    </button>
+                </form>
+
+                <div class="loading" id="queryLoading">
+                    <div class="spinner"></div>
+                    <span>Searching database...</span>
+                </div>
+
+                <div id="queryResults" class="results"></div>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="section">
+                <h2>
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                    </svg>
+                    Add Documents
+                </h2>
+
+                <!-- Upload Method Selector -->
+                <div class="form-group">
+                    <label>Upload Method:</label>
+                    <div class="upload-method-selector">
+                        <button type="button" class="method-btn active" id="fileMethodBtn">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                            </svg>
+                            Upload Files
+                        </button>
+                        <button type="button" class="method-btn" id="linkMethodBtn">
+                            <svg class="icon" viewBox="0 0 24 24">
+                                <path d="M3.9,12C3.9,10.29 5.29,8.9 7,8.9H11V7H7A5,5 0 0,0 2,12A5,5 0 0,0 7,17H11V15.1H7C5.29,15.1 3.9,13.71 3.9,12M8,13H16V11H8V13M17,7H13V8.9H17C18.71,8.9 20.1,10.29 20.1,12C20.1,13.71 18.71,15.1 17,15.1H13V17H17A5,5 0 0,0 22,12A5,5 0 0,0 17,7Z"/>
+                            </svg>
+                            From URL
+                        </button>
+                    </div>
+                </div>
+
+                <!-- File Upload Form -->
+                <div id="fileUploadSection" class="upload-section active">
+                    <form id="uploadForm">
+                        <div class="form-group">
+                            <label>Select PDF Files:</label>
+                            <div class="file-upload">
+                                <input 
+                                    type="file" 
+                                    id="pdfFiles" 
+                                    name="pdfFiles" 
+                                    accept=".pdf" 
+                                    multiple
+                                >
+                                <label for="pdfFiles" class="file-upload-label" id="fileLabel">
+                                    <svg class="icon" style="margin-bottom: 10px;" viewBox="0 0 24 24">
+                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                    </svg>
+                                    <div>
+                                        <strong>Click to upload PDF files</strong><br>
+                                        or drag and drop them here
+                                    </div>
+                                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                                        Multiple files supported • PDF format only
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="selectedFiles" style="margin: 15px 0;"></div>
+
+                        <button type="submit" id="uploadBtn">
+                            Upload to Database
+                        </button>
+                    </form>
+                </div>
+
+                <!-- URL Upload Form -->
+                <div id="urlUploadSection" class="upload-section">
+                    <form id="urlForm">
+                        <div class="form-group">
+                            <label for="documentUrl">Document URL:</label>
+                            <input 
+                                type="url" 
+                                id="documentUrl" 
+                                name="documentUrl" 
+                                placeholder="https://example.com/document.pdf"
+                            >
+                            <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                                Enter a direct link to a PDF document
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="urlList">Or Multiple URLs (one per line):</label>
+                            <textarea 
+                                id="urlList" 
+                                name="urlList" 
+                                placeholder="https://example.com/doc1.pdf&#10;https://example.com/doc2.pdf&#10;https://example.com/doc3.pdf"
+                                rows="4"
+                            ></textarea>
+                            <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                                Enter multiple URLs, one per line
+                            </div>
+                        </div>
+
+                        <button type="submit" id="urlUploadBtn">
+                            Add from URLs
+                        </button>
+                    </form>
+                </div>
+
+                <div class="loading" id="uploadLoading">
+                    <div class="spinner"></div>
+                    <span>Processing and uploading documents...</span>
+                </div>
+
+                <div id="uploadStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:8081/api'; // Adjust this to your Python backend URL
+
+        // DOM Elements
+        const queryForm = document.getElementById('queryForm');
+        const uploadForm = document.getElementById('uploadForm');
+        const urlForm = document.getElementById('urlForm');
+        const queryBtn = document.getElementById('queryBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const urlUploadBtn = document.getElementById('urlUploadBtn');
+        const queryLoading = document.getElementById('queryLoading');
+        const uploadLoading = document.getElementById('uploadLoading');
+        const queryResults = document.getElementById('queryResults');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const pdfFiles = document.getElementById('pdfFiles');
+        const fileLabel = document.getElementById('fileLabel');
+        const selectedFiles = document.getElementById('selectedFiles');
+        const fileMethodBtn = document.getElementById('fileMethodBtn');
+        const linkMethodBtn = document.getElementById('linkMethodBtn');
+        const fileUploadSection = document.getElementById('fileUploadSection');
+        const urlUploadSection = document.getElementById('urlUploadSection');
+
+        // Upload Method Switching
+        fileMethodBtn.addEventListener('click', function() {
+            switchUploadMethod('file');
+        });
+
+        linkMethodBtn.addEventListener('click', function() {
+            switchUploadMethod('url');
+        });
+
+        // Upload Method Switching
+        fileMethodBtn.addEventListener('click', function() {
+            switchUploadMethod('file');
+        });
+
+        linkMethodBtn.addEventListener('click', function() {
+            switchUploadMethod('url');
+        });
+
+        function switchUploadMethod(method) {
+            if (method === 'file') {
+                fileMethodBtn.classList.add('active');
+                linkMethodBtn.classList.remove('active');
+                fileUploadSection.classList.add('active');
+                urlUploadSection.classList.remove('active');
+            } else {
+                linkMethodBtn.classList.add('active');  
+                fileMethodBtn.classList.remove('active');
+                urlUploadSection.classList.add('active');
+                fileUploadSection.classList.remove('active');
+            }
+            clearUploadStatus();
+        }
+
+        // File Upload Handling
+        pdfFiles.addEventListener('change', function(e) {
+            displaySelectedFiles(e.target.files);
+        });
+
+        // Drag and drop functionality
+        fileLabel.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileLabel.classList.add('dragover');
+        });
+
+        fileLabel.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileLabel.classList.remove('dragover');
+        });
+
+        fileLabel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileLabel.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            pdfFiles.files = files;
+            displaySelectedFiles(files);
+        });
+
+        function displaySelectedFiles(files) {
+            if (files.length === 0) {
+                selectedFiles.innerHTML = '';
+                return;
+            }
+
+            let html = '<div style="font-weight: 600; margin-bottom: 10px;">Selected Files:</div>';
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                html += `<div style="padding: 8px; background: #f0f2ff; border-radius: 5px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>${file.name}</span>
+                    <span style="color: #666; font-size: 12px;">${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>`;
+            }
+            selectedFiles.innerHTML = html;
+        }
+
+        // Query Form Handler
+        queryForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const query = document.getElementById('query').value;
+            const numResults = document.getElementById('numResults').value;
+            
+            showLoading(queryLoading, queryBtn, 'Searching...');
+            clearResults();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        num_results: parseInt(numResults)
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayResults(data.results);
+                
+            } catch (error) {
+                console.error('Query error:', error);
+                showError('Failed to query database. Please check if the backend is running.');
+            } finally {
+                hideLoading(queryLoading, queryBtn, 'Search Database');
+            }
+        });
+
+        // Upload Form Handler
+        uploadForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const files = pdfFiles.files;
+            if (files.length === 0) {
+                showError('Please select at least one PDF file.');
+                return;
+            }
+            
+            showLoading(uploadLoading, uploadBtn, 'Uploading...');
+            clearUploadStatus();
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                showSuccess(`Successfully uploaded ${files.length} PDF(s) to the database!`);
+                uploadForm.reset();
+                selectedFiles.innerHTML = '';
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                showError('Failed to upload PDFs. Please check if the backend is running and files are valid.');
+            } finally {
+                hideLoading(uploadLoading, uploadBtn, 'Upload to Database');
+            }
+        });
+
+        // URL Upload Form Handler
+        urlForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const singleUrl = document.getElementById('documentUrl').value.trim();
+            const urlListText = document.getElementById('urlList').value.trim();
+            
+            let urls = [];
+            if (singleUrl) {
+                urls.push(singleUrl);
+            }
+            if (urlListText) {
+                const listUrls = urlListText.split('\n')
+                    .map(url => url.trim())
+                    .filter(url => url.length > 0);
+                urls = urls.concat(listUrls);
+            }
+            
+            if (urls.length === 0) {
+                showError('Please enter at least one URL.');
+                return;
+            }
+            
+            // Validate URLs
+            const invalidUrls = urls.filter(url => !isValidUrl(url));
+            if (invalidUrls.length > 0) {
+                showError(`Invalid URLs found: ${invalidUrls.join(', ')}`);
+                return;
+            }
+            
+            showLoading(uploadLoading, urlUploadBtn, 'Processing URLs...');
+            clearUploadStatus();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/upload-url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        urls: urls
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                showSuccess(`Successfully processed ${urls.length} URL(s) and added documents to the database!`);
+                urlForm.reset();
+                
+            } catch (error) {
+                console.error('URL upload error:', error);
+                showError('Failed to process URLs. Please check if the backend is running and URLs are accessible.');
+            } finally {
+                hideLoading(uploadLoading, urlUploadBtn, 'Add from URLs');
+            }
+        });
+
+        // Utility Functions
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function showLoading(loadingElement, buttonElement, buttonText) {
+            loadingElement.classList.add('show');
+            buttonElement.disabled = true;
+            buttonElement.textContent = buttonText;
+        }
+
+        function hideLoading(loadingElement, buttonElement, originalText) {
+            loadingElement.classList.remove('show');
+            buttonElement.disabled = false;
+            buttonElement.textContent = originalText;
+        }
+
+        function displayResults(results) {
+            if (!results || results.length === 0) {
+                queryResults.innerHTML = '<div class="result-item"><p>No results found for your query.</p></div>';
+                return;
+            }
+            
+            let html = '';
+            results.forEach((result, index) => {
+                html += `
+                    <div class="result-item">
+                        <h3>Result ${index + 1}</h3>
+                        <p><strong>Score:</strong> ${result.score ? result.score.toFixed(4) : 'N/A'}</p>
+                        <p><strong>Content:</strong> ${result.content || result.text || 'No content available'}</p>
+                        <p><strong>Source:</strong> ${result.location || 'No source available'}</p>
+                        <p><strong>Document Section:</strong> ${result.section || 'No section available'}</p>
+                    </div>
+                `;
+            });
+            queryResults.innerHTML = html;
+        }
+
+        function showSuccess(message) {
+            uploadStatus.innerHTML = `<div class="success-message">${message}</div>`;
+        }
+
+        function showError(message) {
+            const errorDiv = `<div class="error-message">${message}</div>`;
+            if (uploadStatus.innerHTML.includes('error-message')) {
+                uploadStatus.innerHTML = errorDiv;
+            } else {
+                queryResults.innerHTML = errorDiv;
+            }
+        }
+
+        function clearResults() {
+            queryResults.innerHTML = '';
+        }
+
+        function clearUploadStatus() {
+            uploadStatus.innerHTML = '';
+        }
+
+        // Initialize
+        console.log('Vector Database Client initialized');
+        console.log('Backend URL:', API_BASE_URL);
+    </script>
+</body>
+</html>

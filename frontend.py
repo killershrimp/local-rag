@@ -1,10 +1,8 @@
+from io import BytesIO
 from typing import Any, Dict, List, Optional
 
 import torch
-from datasets import Dataset
-from docling.document_converter import DocumentConverter
-from transformers import (AutoTokenizer, DPRContextEncoder, DPRQuestionEncoder,
-                          RagConfig, RagRetriever)
+from transformers import AutoTokenizer, DPRContextEncoder, DPRQuestionEncoder
 
 from DocReader import DocReader
 from VectorDataset import VectorDataset
@@ -20,7 +18,6 @@ class Client:
 
         self.ctx_tok = AutoTokenizer.from_pretrained(ctx_model_name)
         self.ctx_enc = DPRContextEncoder.from_pretrained(ctx_model_name)
-        self.ctx_tok.add_special_tokens({"pad_token": self.ctx_tok.pad_token})
         self.ctx_window = 512
 
         self.q_tok = AutoTokenizer.from_pretrained(q_model_name)
@@ -30,11 +27,25 @@ class Client:
         self.md_formatter = DocReader()
         pass
 
-    def add_docs(self, docs: List[str]):
-        md_outs = (self.md_formatter.read(doc) for doc in docs)
+    def add_docs(self, docs: List[str | List[bytes | str]]):
+        locs = []
+        md_outs = []
+
+        # get markdown from files (either parse from URL/path or byte stream)
+        for d in docs:
+            if isinstance(d, str):
+                # given URL
+                locs.append(d)
+                md_outs.append(self.md_formatter.read_link(d))
+            else:
+                # given file as bytes
+                name = d[1]
+                locs.append(name)
+                md_outs.append(self.md_formatter.read_bytes(name, BytesIO(d[0])))
+
         all_content = []
 
-        for loc, doc in zip(docs, md_outs):
+        for loc, doc in zip(locs, md_outs):
             sections = self.md_formatter.split_md(doc)
 
             hdr_list = []
@@ -50,20 +61,25 @@ class Client:
 
             with torch.no_grad():
                 emb = self.ctx_enc(new_tok).pooler_output
+
+            norm = torch.linalg.norm(emb, dim=-1).unsqueeze(dim=1)
+            emb = emb / norm
+
             plaintext = self.ctx_tok.batch_decode(new_tok, ignore_special_tokens=True)
 
             content = [
                 {
                     "location": loc,
-                    "text": text,
+                    "text": text.replace(self.ctx_tok.pad_token, ""),
                     "embedding": embedding.numpy(),
-                    "label": label,
+                    "section": section,
                     "metadata": {},
                 }
-                for text, embedding, label in zip(plaintext, emb, hdr_list)
+                for text, embedding, section in zip(plaintext, emb, hdr_list)
             ]
             all_content.append(content)
         self.ds.add_docs(all_content)
+        print(f"new ds size: {len(self.ds)}")
 
     def _sliding_window_tok(
         self, text: str, window_size: int = 512, overlap_size: int = 32
@@ -100,16 +116,23 @@ class Client:
         return tokenized_text
 
     def retrieve(self, query: str, n_docs: int = 5) -> List[Dict[str, Any]]:
+        if not len(self.ds):
+            return []
+
         tok_q = self.q_tok(
             query,
             return_tensors="pt",
             padding="max_length",
             truncation=True,
-            max_length=512,
+            max_length=self.ctx_window,
             add_special_tokens=False,
         )
         with torch.no_grad():
-            np_q = self.q_enc(**tok_q).pooler_output.numpy()
+            emb = self.q_enc(**tok_q).pooler_output
+        norm = torch.linalg.norm(emb, dim=-1).unsqueeze(dim=1)
+        emb = emb / norm
 
-        out = self.ds.faiss_search(np_q, k=n_docs)
+        norm = torch.linalg.norm(emb, dim=-1)
+
+        out = self.ds.faiss_search(emb.numpy(), k=n_docs)
         return out
