@@ -319,10 +319,8 @@ class VectorDataset:
 
         # Get metadata for results
         results = self.get_metadata_by_indices(indices[0])
-        # for i, result in enumerate(results):
-        #     print(
-        #         f"Result {i}: {result['text'][:50]}... (score: {distances[0][i]}) (loc: {result['location']}) (section: {result['section']})"
-        #     )
+        for i, result in enumerate(results):
+            print(f"Result {i}: {result['text'][:50]}... (score: {distances[0][i]})")
         return results
 
 

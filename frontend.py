@@ -28,20 +28,18 @@ class Client:
         pass
 
     def add_docs(self, docs: List[str | List[bytes | str]]):
-        locs = []
+        locs: List[str] = [i if isinstance(i, str) else i[0] for i in docs]
         md_outs = []
 
         # get markdown from files (either parse from URL/path or byte stream)
         for d in docs:
             if isinstance(d, str):
                 # given URL
-                locs.append(d)
                 md_outs.append(self.md_formatter.read_link(d))
             else:
                 # given file as bytes
-                name = d[1]
-                locs.append(name)
-                md_outs.append(self.md_formatter.read_bytes(name, BytesIO(d[0])))
+                name = d[0]
+                md_outs.append(self.md_formatter.read_bytes(name, BytesIO(d[1])))
 
         all_content = []
 
@@ -79,7 +77,6 @@ class Client:
             ]
             all_content.append(content)
         self.ds.add_docs(all_content)
-        print(f"new ds size: {len(self.ds)}")
 
     def _sliding_window_tok(
         self, text: str, window_size: int = 512, overlap_size: int = 32

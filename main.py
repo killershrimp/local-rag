@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import uvicorn
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, conlist, validator
 
 from frontend import Client
 
@@ -36,11 +36,11 @@ class SearchRequest(BaseModel):
 
 
 class AddDocsRequest(BaseModel):
-    docs: List[str] = Field(
+    urls: List[str] = Field(
         ..., min_items=1, max_items=1000, description="List of documents to add"
     )
 
-    @validator("docs")
+    @validator("urls")
     def validate_docs(cls, v):
         # Filter out empty documents
         filtered_docs = [doc.strip() for doc in v if doc and doc.strip()]
@@ -120,7 +120,9 @@ class PyArrowVectorDBWrapper:
         self.is_ready = True
         logger.info("PyArrow Vector DB wrapper initialized")
 
-    async def add_documents_async(self, docs: List[List[bytes | str]]) -> Dict[str, Any]:
+    async def add_documents_async(
+        self, docs: List[str | List[bytes | str]]
+    ) -> Dict[str, Any]:
         """
         Async wrapper for add_docs method
         """
@@ -316,9 +318,36 @@ async def search_documents(request: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
-# TODO: add URL upload
+@app.post("/api/upload-url")
+async def upload_url(
+    background_tasks: BackgroundTasks,
+    files: AddDocsRequest,
+):
+    """
+    Upload documents from a bunch of files
+    """
+    if not vector_db or not vector_db.is_ready:
+        raise HTTPException(status_code=503, detail="Vector database not available")
+
+    try:
+        # Add documents in background
+        background_tasks.add_task(vector_db.add_documents_async, files.urls)
+
+        return {
+            "message": f"Upload initiated for {len(files.urls)} documents",
+            "docs_count": len(files.urls),
+            "status": "processing",
+        }
+
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be valid UTF-8 text")
+    except Exception as e:
+        logger.error(f"Error uploading file: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
 @app.post("/api/upload")
-async def upload_documents(
+async def upload_files(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
 ):
@@ -330,8 +359,7 @@ async def upload_documents(
 
     try:
         # Read file content
-        # TODO: add support for multi file upload
-        content = [[await file.read(), file.filename] for file in files]
+        content = [[file.filename, await file.read()] for file in files]
 
         # Add documents in background
         background_tasks.add_task(vector_db.add_documents_async, content)

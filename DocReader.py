@@ -21,6 +21,14 @@ class DocReader:
         docling_stream = DocumentStream(name=name, stream=stream)
         return self.converter.convert(docling_stream).document.export_to_markdown()
 
+    def read_batch(self, files_or_streams: List[str | List[str | bytes]]) -> List[str]:
+        formatted = [
+            i if isinstance(i, str) else DocumentStream(name=i[0], stream=BytesIO(i[1]))
+            for i in files_or_streams
+        ]
+        docs = self.converter.convert_all(formatted)
+        return [i.document.export_to_markdown() for i in docs]
+
     def split_md(self, markdown_text: str):
         # Define a regex pattern for Markdown headers
         header_pattern = r"^(#{1,6})\s+(.*)$"
